@@ -2,17 +2,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <pmmintrin.h>
+
 
 // Define output file name
 #define OUTPUT_FILE "stencil.pgm"
+
+#define type float
+#define ALIGN 32
 
 // Define constant expressions
 #define NUM_3_DIV_5 0.6
 #define NUM_05_DIV_5 0.1
 
-void stencil(const int nx, const int ny, double *  image, double *  tmp_image);
-void init_image(const int nx, const int ny, double *  image, double *  tmp_image);
-void output_image(const char * file_name, const int nx, const int ny, double *image);
+void stencil(const int nx, const int ny, type * restrict image, type * restrict tmp_image);
+void init_image(const int nx, const int ny, type *  image, type *  tmp_image);
+void output_image(const char * file_name, const int nx, const int ny, type *image);
 double wtime(void);
 
 int main(int argc, char *argv[]) {
@@ -29,8 +34,8 @@ int main(int argc, char *argv[]) {
   int niters = atoi(argv[3]);
 
   // Allocate the image
-  double *image = malloc(sizeof(double)*nx*ny);
-  double *tmp_image = malloc(sizeof(double)*nx*ny);
+  type *image = _mm_malloc(sizeof(type)*nx*ny, ALIGN);
+  type *tmp_image = _mm_malloc(sizeof(type)*nx*ny, ALIGN);
 
   // Set the input image
   init_image(nx, ny, image, tmp_image);
@@ -50,23 +55,42 @@ int main(int argc, char *argv[]) {
   printf("------------------------------------\n");
 
   output_image(OUTPUT_FILE, nx, ny, image);
-  free(image);
+  _mm_free(image);
+  _mm_free(tmp_image);
 }
 
-void stencil(const int nx, const int ny, double *  image, double *  tmp_image) {
+void stencil(const int nx, const int ny, type * restrict  image, type * restrict  tmp_image) {
   int size = nx*ny;
-  double *ival = image;
-  double *tmp_ival = tmp_image;
+  type *ival = image;
+  type *tmp_ival = tmp_image;
   int ny_min_1 = ny-1;
   int size_min_ny = size-ny;
-  for(int i=0;i<size;++i){
-     (*tmp_ival) = (*ival) * NUM_3_DIV_5;
+
+  int i=0;
+  for(;i<=ny;++i){
+    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5;
+    if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
+    if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
+    ++ival;
+    ++tmp_ival;
+  }
+
+  for(;i<size_min_ny;++i){
+     (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5;
      if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
      if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
-     if(i>ny) (*tmp_ival) += (*(ival-ny)) * NUM_05_DIV_5;
-     if(i<size_min_ny) (*tmp_ival) += (*(ival+ny)) * NUM_05_DIV_5;
+     //if(i>ny) (*tmp_ival) += (*(ival-ny)) * NUM_05_DIV_5;
+//     if(i<size_min_ny) (*tmp_ival) += (*(ival+ny)) * NUM_05_DIV_5;
      ++ival;
      ++tmp_ival;
+  }
+
+  for(;i<size;++i){
+    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5;
+    if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
+    if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
+    ++ival;
+    ++tmp_ival;
   }
 
 
@@ -82,7 +106,7 @@ void stencil(const int nx, const int ny, double *  image, double *  tmp_image) {
 }
 
 // Create the input image
-void init_image(const int nx, const int ny, double *  image, double *  tmp_image) {
+void init_image(const int nx, const int ny, type *  image, type *  tmp_image) {
   // Zero everything
   for (int j = 0; j < ny; ++j) {
     for (int i = 0; i < nx; ++i) {
@@ -105,7 +129,7 @@ void init_image(const int nx, const int ny, double *  image, double *  tmp_image
 }
 
 // Routine to output the image in Netpbm grayscale binary image format
-void output_image(const char * file_name, const int nx, const int ny, double *image) {
+void output_image(const char * file_name, const int nx, const int ny, type *image) {
 
   // Open output file
   FILE *fp = fopen(file_name, "w");
@@ -120,7 +144,7 @@ void output_image(const char * file_name, const int nx, const int ny, double *im
   // Calculate maximum value of image
   // This is used to rescale the values
   // to a range of 0-255 for output
-  double maximum = 0.0;
+  type maximum = 0.0;
   for (int j = 0; j < ny; ++j) {
     for (int i = 0; i < nx; ++i) {
       if (image[j+i*ny] > maximum)
