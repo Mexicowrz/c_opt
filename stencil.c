@@ -66,43 +66,42 @@ void stencil(const int nx, const int ny, type * restrict  image, type * restrict
   int ny_min_1 = ny-1;
   int size_min_ny = size-ny;
 
-  int i=0;
+  int i=1;
+  (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+  ++ival;
+  ++tmp_ival;
+int dd = 0;
+#pragma vector aligned, vecremainer
+#pragma simd vectorlengthfor(type)
   for(;i<=ny;++i){
-    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5;
-    if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
-    if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
+    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
     ++ival;
     ++tmp_ival;
   }
-
+#pragma vector aligned, vecremainer
+#pragma simd vectorlengthfor(type)
   for(;i<size_min_ny;++i){
-     (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5;
-     if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
-     if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
-     //if(i>ny) (*tmp_ival) += (*(ival-ny)) * NUM_05_DIV_5;
-//     if(i<size_min_ny) (*tmp_ival) += (*(ival+ny)) * NUM_05_DIV_5;
+     (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
      ++ival;
      ++tmp_ival;
   }
 
-  for(;i<size;++i){
-    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5;
-    if(i%ny) (*tmp_ival) += (*(ival-1)) * NUM_05_DIV_5;
-    if(i%ny!=ny_min_1) (*tmp_ival) += (*(ival+1)) * NUM_05_DIV_5;
+#pragma vector aligned, vecremainer
+#pragma simd vectorlengthfor(type)
+  for(;i<size-1;++i){
+    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
     ++ival;
     ++tmp_ival;
   }
 
-
-/*  for (int j = 0; j < ny; ++j) {
-    for (int i = 0; i < nx; ++i) {
-//      tmp_image[j+i*ny] = image[j+i*ny] * NUM_3_DIV_5;
-      //if (i > 0)    tmp_image[j+i*ny] += image[j  +(i-1)*ny] * NUM_05_DIV_5;
-      // if (i < nx-1) tmp_image[j+i*ny] += image[j  +(i+1)*ny] * NUM_05_DIV_5;
-      //if (j > 0)    tmp_image[j+i*ny] += image[j-1+i*ny] * NUM_05_DIV_5;
-//      if (j < ny-1) tmp_image[j+i*ny] += image[j+1+i*ny] * NUM_05_DIV_5;
-    }
-  } */
+  dd=0;
+#pragma vector aligned, vecremainer
+#pragma simd vectorlengthfor(type)
+  for(i=ny;i<size;i+=ny){
+   tmp_image[i] -= image[i-1] * NUM_05_DIV_5;
+   tmp_image[i+ny_min_1] -= image[i+ny_min_1+1] * NUM_05_DIV_5;
+   dd+=2;
+  }
 }
 
 // Create the input image
