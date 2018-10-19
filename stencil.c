@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
 
   // Call the stencil kernel
   double tic = wtime();
+  #pragma unroll_and_jam (5)
   for (int t = 0; t < niters; ++t) {
     stencil(nx, ny, image, tmp_image);
     stencil(nx, ny, tmp_image, image);
@@ -70,18 +71,20 @@ void stencil(const int nx, const int ny, type * restrict  image, type * restrict
   (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
   ++ival;
   ++tmp_ival;
-int dd = 0;
+//int dd = 0;
 #pragma vector aligned, vecremainer
 #pragma simd vectorlengthfor(type)
   for(;i<=ny;++i){
-    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+//    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+	(*tmp_ival) = (*ival) * NUM_3_DIV_5 + NUM_05_DIV_5 * ((*(ival+ny)) + (*(ival-1)) + (*(ival+1)));
     ++ival;
     ++tmp_ival;
   }
 #pragma vector aligned, vecremainer
 #pragma simd vectorlengthfor(type)
   for(;i<size_min_ny;++i){
-     (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+//     (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival+ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+	(*tmp_ival) = (*ival) * NUM_3_DIV_5 + NUM_05_DIV_5* ((*(ival-ny)) + (*(ival+ny)) + (*(ival-1)) + (*(ival+1)));
      ++ival;
      ++tmp_ival;
   }
@@ -89,18 +92,18 @@ int dd = 0;
 #pragma vector aligned, vecremainer
 #pragma simd vectorlengthfor(type)
   for(;i<size-1;++i){
-    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + (*(ival-ny)) * NUM_05_DIV_5 + (*(ival-1)) * NUM_05_DIV_5 + (*(ival+1)) * NUM_05_DIV_5;
+    (*tmp_ival) = (*ival) * NUM_3_DIV_5 + NUM_05_DIV_5 * ((*(ival-ny)) + (*(ival-1)) + (*(ival+1)));
     ++ival;
     ++tmp_ival;
   }
 
-  dd=0;
+  //dd=0;
 #pragma vector aligned, vecremainer
 #pragma simd vectorlengthfor(type)
   for(i=ny;i<size;i+=ny){
    tmp_image[i] -= image[i-1] * NUM_05_DIV_5;
    tmp_image[i+ny_min_1] -= image[i+ny_min_1+1] * NUM_05_DIV_5;
-   dd+=2;
+//   dd+=2;
   }
 }
 
